@@ -1,11 +1,14 @@
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("OAuth2.Net.Http.UnitTest")]
 
 namespace System.Net.Http.Extensions
 {
     internal static class OAuth2HttpClientExtensions
     {
-        public static OAuth2HttpClientHandler GetHandler(this OAuth2HttpClient httpClient)
+        internal static OAuth2HttpClientHandler GetHandler(this OAuth2HttpClient httpClient)
         {
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
 
@@ -14,18 +17,20 @@ namespace System.Net.Http.Extensions
             return (OAuth2HttpClientHandler) field?.GetValue(httpClient);
         }
 
-        private static Uri BuildTokenUri(this OAuth2HttpClient httpClient)
+        internal static Uri BuildTokenUri(this OAuth2HttpClient httpClient)
         {
             var tempTokenUrl = (httpClient.TokenUrl ?? "/token");
 
-            var tokenUrl = tempTokenUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
-                ? tempTokenUrl
-                : $"{httpClient.BaseAddress}{tempTokenUrl}";
+            if (!tempTokenUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase) && httpClient.BaseAddress == default)
+                throw new OperationCanceledException(
+                    "OAuth2HttpClient property BaseAddress must be provides when TokenUrl is null or empty");
 
-            return new Uri(tempTokenUrl);
+            return tempTokenUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                ? new Uri(tempTokenUrl)
+                : new Uri(httpClient.BaseAddress, tempTokenUrl);
         }
 
-        private static FormUrlEncodedContent BuildFormUrlEncodedContent(this OAuth2HttpClient httpClient)
+        internal static FormUrlEncodedContent BuildFormUrlEncodedContent(this OAuth2HttpClient httpClient)
         {
             var payload = new List<KeyValuePair<string, string>>()
             {
@@ -44,7 +49,7 @@ namespace System.Net.Http.Extensions
             return new FormUrlEncodedContent(payload);
         }
 
-        public static HttpRequestMessage BuildRequestTokenHttpRequestMessage(this OAuth2HttpClient httpClient)
+        internal static HttpRequestMessage BuildRequestTokenHttpRequestMessage(this OAuth2HttpClient httpClient)
         {
             return new HttpRequestMessage(HttpMethod.Post, httpClient.BuildTokenUri())
             {
